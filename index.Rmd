@@ -1,30 +1,59 @@
 ---
 title: "Practical Machine Learning Course Project"
+subtitle: "Practical Machine Learning project"
 author: "Elmer Ore"
-date: "13/04/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+# Executive Summary
+
+In this report I aim to replicate the findings of the Human Activity Recognition experiment and be able to identify how well the 6 partifipants did the dumbbell bicepts curl vs. common mistakes being recorded.  By analyzing the data provided I exclude some predictors that did not have a relationship wih the outcome or predictors with high number of null or empty values.  For this classification project I created a recipe to prepare the data and choosed to use random forest as the model to solve the problem.  From this model **I found that 26 predictors shows the highest accuracy of 99.57% for Out-of-bag error.**  Finally, I included the list of the top 20 variables that most affects the final model.
+
+## Exploratory Analysis
+
+- Identified mostly null or empty variables, I decided 97% as a cutoff value.
+- Also identified fields not useful in predicting how the exercise was done.  Decided to remove the variables: unique sequential number, user name, timestamps, and window information.
+
+## Reproducible Research
+
+- Decided to use recipes, to make is clearer the steps to reproduce the analysis.
+- Removed the fields identified in the exploratory analysis.
+- Exclude near zero variace and variable correlated.
+- Converted all factor variables into dummy variables, except the outcome.
+- Center and scale the rest of variables.
+\newline
+
+
+```{r setup, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+
+
 ```
 
-## R Markdown
+## Model Selection
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
+I decided to use 10-fold cross validation due to the size of the training set and number of variables available. 
+In terms of model, I decided to use the random forests model. 
 
 ```{r pressure, echo=FALSE}
 plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+### Model Validation
+
+To validate if the 3 variables identified in the AIC methos are really necessary I did an "Analysis of Variance" (ANOVA) test using nested models. The results show that the 3rd model has a significant reduction of RSS and better model fits. See Appendix #3 for details.
+\newline
+
+## Conclusions
+
+The model (see summary on Appendix #2) shows:
+
+- A manual transmission car produces in average 2.9 MPG higher performance than an automatic car with all other variables being constant with 95% accuracy.
+- Not statisticall signficant effect of autmatic cars on MPG performance (p-value = 17.79%).
+- An extra 1000 lbs in weight results in -3.9 MPG decrease in performance with all other variables being constant with 95% accuracy. 
+- An extra second on going through 1/4 mile results in an additional 1.2 MPG with all other variables being constant with 95% accuracy.
+- The model explains 84.97% variability of MPG.
+\newpage
+
+## References
+
+- The data used for this project comes from <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>.
