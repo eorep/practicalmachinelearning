@@ -1,59 +1,155 @@
 ---
-title: "Practical Machine Learning Course Project"
+title: "Yaw belt, Pitch forearm and Pitch belt are the best predictors of the quality of a dumbbell biceps curl."
 subtitle: "Practical Machine Learning project"
 author: "Elmer Ore"
 output: html_document
 ---
 
-# Executive Summary
+## Executive Summary
 
-In this report I aim to replicate the findings of the Human Activity Recognition experiment and be able to identify how well the 6 partifipants did the dumbbell bicepts curl vs. common mistakes being recorded.  By analyzing the data provided I exclude some predictors that did not have a relationship wih the outcome or predictors with high number of null or empty values.  For this classification project I created a recipe to prepare the data and choosed to use random forest as the model to solve the problem.  From this model **I found that 26 predictors shows the highest accuracy of 99.57% for Out-of-bag error.**  Finally, I included the list of the top 20 variables that most affects the final model.
+In this report I aim to replicate the findings of the Human Activity Recognition experiment and be able to identify how well the 6 participants did the dumbbell biceps curl against common mistakes being recorded.  By analyzing the data provided I excluded some predictors that did not have a relationship wih the outcome or predictors with high number of null or empty values.  For this classification project I created a 'recipe' to prepare the data and decided to use Random Forest as the model to help predict the participants activities.  From this model **I found that 26 predictors shows the highest accuracy of 99.57% for out-of-bag error.**  Finally, I included the list of the top 20 variables with the highest impact in the final model.
 
 ## Exploratory Analysis
 
-- Identified mostly null or empty variables, I decided 97% as a cutoff value.
-- Also identified fields not useful in predicting how the exercise was done.  Decided to remove the variables: unique sequential number, user name, timestamps, and window information.
+- I identified mostly null or empty predictors, I decided 97% as a cutoff value.
+- I also identified fields not useful in predicting how the exercise was done.  Decided to remove the variables: unique sequential number, user name, timestamps, and window information.
+
+```{r setup, echo=TRUE, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
+library(dplyr)
+
+# Getting original data
+training <- read.csv(file="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+validation <- read.csv(file="https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+missing_function <- function(vector){
+  ##The ifelse returns TRUE if the element in the vector is NA, NULL, or ""
+  x <- ifelse(is.na(vector)|vector == ""|is.null(vector), TRUE, FALSE)
+  
+  ##Returns the sum of boolean vector (FALSE = 0, TRUE = 1)
+  return(sum(x))
+}
+
+fields_remove <- tibble(variable = colnames(training),
+                        total_missing = sapply(training, missing_function),
+                        rate = total_missing/nrow(training))
+
+# Using 97% as a cutoff for removing null or empty variables.
+fields_remove <- fields_remove %>% filter(rate > 0.97) %>% select(variable)
+
+# Adding manual variables to the fields to remove not related to the outcome.
+fields_remove <- bind_rows(fields_remove, 
+                           data.frame(variable = c("X", "raw_timestamp_part_1", "raw_timestamp_part_2", "cvtd_timestamp", "new_window", "num_window"), 
+                                      stringsAsFactors = FALSE))
+
+fields_remove <- as.vector(fields_remove$variable)
+
+```
 
 ## Reproducible Research
 
-- Decided to use recipes, to make is clearer the steps to reproduce the analysis.
-- Removed the fields identified in the exploratory analysis.
-- Exclude near zero variace and variable correlated.
-- Converted all factor variables into dummy variables, except the outcome.
-- Center and scale the rest of variables.
+- I decided to use **recipes**, to increase the reproducibility of the analysis.
+- I removed the predictors identified in the exploratory analysis as not useful for the model.
+- I excluded near zero variance and correlated predictors.
+- I converted all factor variables into dummy variables, except the outcome.
+- I center and scale the rest of the variables.
 \newline
 
+```{r message=FALSE, results='hide', warning=FALSE}
+library(dplyr)
+library(recipes)
 
-```{r setup, echo=TRUE, message=FALSE, warning=FALSE, results='hide'}
+#creation of the recipe.
+train_recipe <- recipe(classe ~ ., data = training) %>%
+  step_rm(one_of(fields_remove)) %>%
+  step_nzv(all_predictors()) %>%
+  step_corr(all_numeric()) %>%
+  step_dummy(all_nominal(), - all_outcomes()) %>%
+  step_center(all_predictors()) %>%
+  step_scale(all_predictors()) 
 
+# preparing the recipe
+trained_recipe <- prep(train_recipe, training = training)
+
+# executing the recipe in both datasets.
+train_data <- bake(trained_recipe, new_data = training)
+exam_data <- bake(trained_recipe, new_data = validation)
 
 ```
 
 ## Model Selection
 
-I decided to use 10-fold cross validation due to the size of the training set and number of variables available. 
-In terms of model, I decided to use the random forests model. 
+I decided to use 10-fold cross validation due to the size of the training set and number of predictors available. 
+In terms of the model, I decided to use the Random Forests model for this classification problem.  
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r message=FALSE, results='hide', warning=FALSE, cache=TRUE}
+library(caret)
+library(parallel)
+library(doParallel)
+
+# Configuring parallel processing
+cluster <- makeCluster(5) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+
+# Configuring parameters, 10 fold cross validation.
+fitControl <- trainControl(method = "cv",
+                           number = 10,
+                           allowParallel = TRUE)
+
+set.seed(778)
+#executing the model
+fit <- train(classe~., method="rf",data=train_data, trControl = fitControl)
+
+# De-register parallel processing cluster
+stopCluster(cluster)
+registerDoSEQ()
+
 ```
 
-### Model Validation
+## Model Validation
 
-To validate if the 3 variables identified in the AIC methos are really necessary I did an "Analysis of Variance" (ANOVA) test using nested models. The results show that the 3rd model has a significant reduction of RSS and better model fits. See Appendix #3 for details.
-\newline
+Since cross-validation was used, I calculated the average accuracy of the out-of-sample samples. 
+
+```{r message=FALSE, results='show'}
+# average of out-of-sample accuracy for the 10 CV samples.
+mean(fit$resample$Accuracy)
+```
+
+However, the out-of-sample accuracy is bias towards the training set.  Since I used Random Forest there is something called 'out of bag error' which is intended to compensate for this and can be more accurate.  It shows that the accuracy of the model is **`r round(fit$modelInfo$oob(fit$finalModel)[1]*100,2)`%**.
+
+```{r message=FALSE, results='show'}
+# Out-of-bag error from random forest, to compensate from CV bias.
+fit$modelInfo$oob(fit$finalModel)
+```
+
+Here are the list of the top 20 predictors with highest impact in the final model.
+
+```{r message=FALSE, echo=FALSE, warning=FALSE, fig.height = 4, fig.width = 6} 
+library(caret)
+library(ggplot2)
+
+list_variables <- varImp(fit, scale = FALSE)
+ggplot(list_variables, top=20) + 
+       ggtitle("Predictors with highest impact in model")
+```
+
+The image below shows that when the model randomly selected 26 predictors it obtained the highest accuracy.
+
+```{r message=FALSE, echo=FALSE, warning=FALSE, fig.height = 4, fig.width = 6} 
+library(ggplot2)
+
+ggplot(fit) +
+  ggtitle("26 predictors shows the highest accuracy")
+```
 
 ## Conclusions
 
-The model (see summary on Appendix #2) shows:
+The model shows:
 
-- A manual transmission car produces in average 2.9 MPG higher performance than an automatic car with all other variables being constant with 95% accuracy.
-- Not statisticall signficant effect of autmatic cars on MPG performance (p-value = 17.79%).
-- An extra 1000 lbs in weight results in -3.9 MPG decrease in performance with all other variables being constant with 95% accuracy. 
-- An extra second on going through 1/4 mile results in an additional 1.2 MPG with all other variables being constant with 95% accuracy.
-- The model explains 84.97% variability of MPG.
-\newpage
+- The Random Forest model restulted with an out-of-bag accuracy of **`r round(fit$modelInfo$oob(fit$finalModel)[1]*100,2)`%**.
+- The most important predictors identified are: Yaw belt, pitch forearm and pitch belt.
+- The model identified 26 randomly selected predictors as the combination that resulted in the highest accuracy.
 
 ## References
 
 - The data used for this project comes from <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>.
+- The function to identify null or empty values was found in this post <https://stackoverflow.com/questions/53036693/handle-missingness-including-null-values-in-r>.
