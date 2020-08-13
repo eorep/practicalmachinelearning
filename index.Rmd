@@ -12,7 +12,7 @@ In this report I aim to replicate the findings of the Human Activity Recognition
 ## Exploratory Analysis
 
 - I identified mostly null or empty predictors, I decided 97% as a cutoff value.
-- I also identified fields not useful in predicting how the exercise was done.  Decided to remove the variables: unique sequential number, user name, timestamps, and window information.
+- I also identified fields not useful in predicting how the exercise was done.  I decided to remove the variables: unique sequential number, user name, timestamps, and window information.
 
 ```{r setup, echo=TRUE, message=FALSE, warning=FALSE, results='hide', cache=TRUE}
 library(dplyr)
@@ -51,7 +51,7 @@ fields_remove <- as.vector(fields_remove$variable)
 - I removed the predictors identified in the exploratory analysis as not useful for the model.
 - I excluded near zero variance and correlated predictors.
 - I converted all factor variables into dummy variables, except the outcome.
-- I center and scale the rest of the variables.
+- I centered and scaled the rest of the variables.
 \newline
 
 ```{r message=FALSE, results='hide', warning=FALSE}
@@ -146,10 +146,11 @@ ggplot(fit) +
 The model shows:
 
 - The Random Forest model restulted with an out-of-bag accuracy of **`r round(fit$modelInfo$oob(fit$finalModel)[1]*100,2)`%**.
-- The most important predictors identified are: Yaw belt, pitch forearm and pitch belt.
-- The model identified 26 randomly selected predictors as the combination that resulted in the highest accuracy.
+- The most important predictors identified are: Yaw belt, Pitch forearm and Pitch belt.
+- The model identified 26 randomly selected predictors as the combination with the highest accuracy.
 
 ## References
 
+- Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. [Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements](http://groupware.les.inf.puc-rio.br/work.jsf?p1=10335). Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence - SBIA 2012. In: Lecture Notes in Computer Science. , pp. 52-61. Curitiba, PR: Springer Berlin / Heidelberg, 2012. ISBN 978-3-642-34458-9. DOI: 10.1007/978-3-642-34459-6_6.
 - The data used for this project comes from <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>.
 - The function to identify null or empty values was found in this post <https://stackoverflow.com/questions/53036693/handle-missingness-including-null-values-in-r>.
